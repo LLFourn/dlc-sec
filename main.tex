@@ -76,10 +76,10 @@ Make sure not to confuse the notion of \emph{oracle} in the sense of a DLCs with
         (\sk,\pk) \sample \KeyGen \\
         (\eventid^*, t^*, o^*) \sample \F^{\AnnO,\AttO}(\pk) \\
         \pcreturn \\
-        \t \exists(\eventid^*, \cdot, n^*) \in Q_{\AnnO} \land \\
+        \t \exists(\eventid^*, \cdot, \ann^*) \in Q_{\AnnO} \land \\
         \t \exists(\eventid^*, o_j) \in Q_{\AttO} \land \\
         \t o^* \neq o_j \land \\
-        \t \Verify(\eventid^*, n^*, t^*, o^*)
+        \t \Verify(\eventid^*, \ann^*, t^*, o^*)
       }
       \pchspace
       \procedure{ Oracle $\AnnO(\eventid_{i})$ }{
@@ -91,8 +91,8 @@ Make sure not to confuse the notion of \emph{oracle} in the sense of a DLCs with
       \begin{pchstack}[center]
         \pchspace
         \procedure{ Oracle $\AttO(\eventid_{i}, o_{i})$ }{
-        \highlightkeyword{check} \exists (\eventid_i, r_i, n_i) \in Q_{\AnnO} \land (\eventid_i, \cdot) \notin Q_{\AttO} \\
-        t_i \gets \Attest(\sk, \eventid_{i}, r_i, n_i, o_i) \\
+        \highlightkeyword{check} \exists (\eventid_i, r_i, \ann_i) \in Q_{\AnnO} \land (\eventid_i, \cdot) \notin Q_{\AttO} \\
+        \att_i \gets \Attest(\sk, \eventid_{i}, r_i, \ann_i, o_i) \\
         Q_{\AttO} := Q_{\AttO} \cup \{ (\eventid_{i}, o_i) \} \\
         \pcreturn \att_i \\
         }
@@ -118,7 +118,7 @@ We then go on to show that the scheme is secure if the \emph{one-more discrete l
     \procedure{$\KeyGen$}{
       x \sample \ZZ_q \\
       X \gets xG \\
-      \sk := (x, X); \pk := (X); \\
+      \sk := (x, X); \pk := X; \\
       \pcreturn (\sk, \pk)
     }
     \pchspace
@@ -130,14 +130,14 @@ We then go on to show that the scheme is secure if the \emph{one-more discrete l
   \end{pchstack}
   \begin{pchstack}[center]
     \procedure{$\Attest(\sk, \eventid, r, \ann, o)$}{
-      (x, X) := \sk; R := n \\
+      (x, X) := \sk; R := \ann \\
       c \gets H(R, X, \eventid, o) \\
       s \gets r + cx \\
       \pcreturn s
     }
     \pchspace
     \procedure{$\Verify(\pk, \eventid, \ann, \att, o)$}{
-      R := n; s := t; X := \pk \\
+      R := \ann; s := \att; X := \pk \\
       c \gets H(R, X, \eventid, o) \\
       \pcreturn R = sG - cX
     }
