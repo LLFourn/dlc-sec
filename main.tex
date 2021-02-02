@@ -143,7 +143,7 @@ We then go on to show that the scheme is secure if the \emph{one-more discrete l
     }
     \end{pchstack}
   \end{mdframed}
-  \caption{Dryja's Schnorr-like oracle attestation scheme.}
+  \caption{Dryja's Schnorr-like oracle attestation scheme defined for a group with generator $G$ of prime order $q$.}
   \label{dryja}
 \end{figure}
 
@@ -182,7 +182,7 @@ We then go on to show that the scheme is secure if the \emph{one-more discrete l
 \begin{proof}
   We use a forger $\F$ against the unforgeability of Dryja's scheme to construct an adversary $\adv$ against $\OMDL$.
   We take the first challenge group element $X_{0}$ and use it as our oracle's public key.
-  Our strategy is to then use the $\ODL$ oracle to simulate the attestation oracle $\AttO$ after first using the $X_{1}, \ldots, X_{n}$ as the announcements.
+  Our strategy is to then to use the remaining elements $X_{1}, \ldots, X_{n}$ as the announcements from the $\AnnO$ oracle and then use the $\ODL$ oracle to simulate the $\AttO$ oracle.
   Once $\F$ returns a forged attestation we use it to extract the discrete logarithm of $X_{0}$ and work backwards to find the discrete logarithm of the other challenge elements.
 
  \begin{mdframed}
@@ -201,9 +201,9 @@ We then go on to show that the scheme is secure if the \emph{one-more discrete l
       \pchspace
       \begin{pcvstack}
         \procedure{ Simulate $\AnnO(\eventid_{i})$ }{
-          \ann := X_i \\
+          \ann_i := X_i \\
           i = i + 1 \\
-          \pcreturn \ann
+          \pcreturn \ann_i
         }
         \pcvspace
         \procedure{ Simulate $\AttO(\eventid_{i}, o_i)$ }{
@@ -219,7 +219,7 @@ We then go on to show that the scheme is secure if the \emph{one-more discrete l
 
     Note that $\adv$ always solves $\OMDL$ if $\F$ breaks unforgeability except in the case the condition in line 4 causes $\adv$ to abort.
     This can only occur if the forger has created an $\eventid$ with two different possible outcomes that hash to the same $c$ which implies $\F$ has broken the collision resistance of $H$.
-    We can therefore bound the probability of $\F$ succeeding by the difficulty of breaking collision resistance and $\OMDL$ and write $\e \leq \e' + \e_{\CR}$.
+    We can therefore bound the probability of $\F$ succeeding by the difficulty of breaking collision resistance in addition $\OMDL$ and write $\e \leq \e' + \e_{\CR}$.
     Since our reductions takes whatever time $\F$ takes plus the time taken to respond to $\F$'s queries we write $\tau_{\CR} = \tau + O(n)$ and $\tau' = \tau + O(n)$.
 \qed
 \end{proof}
