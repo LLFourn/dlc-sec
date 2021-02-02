@@ -1,0 +1,236 @@
+\documentclass[runningheads]{llncs}
+\usepackage{graphicx}
+
+\usepackage[utf8]{inputenc}
+\usepackage[n,advantage,operators,sets,adversary,landau,probability,notions,logic,ff, mm, primitives,events,complexity,asymptotics,keys]{cryptocode}
+\usepackage{hyperref}
+\usepackage{mdframed}
+
+\title{Security of Discreet Log Contract Attestation Schemes}
+\author{Lloyd Fournier}
+\institute{\email{lloyd.fourn@gmail.com}}
+\date{February 2021}
+
+\newcommand{\eventid}{\mathtt{event\_id}}
+\newcommand{\KeyGen}{\mathsf{KeyGen}}
+\newcommand{\Verify}{\mathsf{Verify}}
+\newcommand{\Announce}{\mathsf{Announce}}
+\newcommand{\Attest}{\mathsf{Attest}}
+\newcommand{\AnnO}{\mathsf{Ann}}
+\newcommand{\AttO}{\mathsf{Att}}
+\newcommand{\att}{t}
+\newcommand{\ann}{a}
+\newcommand{\rightsample}{\hskip2.3pt{\mbox{\tiny${\$}$\normalsize}}\!\!\rightarrow\,}
+\newcommand{\F}{\mathcal{F}}
+
+\begin{document}
+\maketitle
+
+
+\section{Introduction}
+
+In \emph{Discreet Log Contracts}\cite{DLC}, Dryja presents a compelling design for Bitcoin based smart contracts that settle based on real world events.
+The real world outcome of an event is mapped into Bitcoin transactions through entities called \emph{oracles} who provide a cryptographic attestation to a particular outcome.
+
+In this short work we provide security definitions and proofs that were absent from the original work.
+Furthermore, we remark that the scheme can be simplified and achieve the same security properties without assuming a collision resistant hash function.
+This work is unfinished and so far only covers the notion of attestation unforgeability.
+
+
+\begin{definition}[Oracle Attestation Scheme]
+  An oracle attestation scheme consists of four efficient algorithms:
+
+  \begin{itemize}
+    \item $\KeyGen(\cdot) \rightsample (\sk, \pk)$: A key generation algorithm
+    \item $\Announce(\sk, \eventid) \rightsample (r,\ann)$: An event announcement algorithm which the oracle uses to generate an announcement secret $r$ and an announcement $\ann$.
+    \item $\Attest(\sk, \eventid, r, \ann, o) \rightarrow \att$: An event outcome attestation algorithm which the oracle uses to publicly attest to the fact that an event identified previously announced with $\ann$ has has the outcome $o$.
+    \item $\Verify(\pk, \eventid, \ann, \att, o) \rightarrow \bin$: An attestation verification algorithm which verifies that an attestation $\att$ attests to $o$ being the outcome of an event with announcement $\ann$ under the oracle's public key $\pk$.
+  \end{itemize}
+
+\end{definition}
+
+It's important to note that the above definition does not provide an intuition as to why an oracle attestation scheme is useful.
+Users have to be able to use the announcement $\ann$ to anticipate some form of the final attestation for each particular outcome and use it to lock funds on the ledger such that the revelation of the corresponding attestation $\att$ will have the desired effect.
+This is why $\Attest$ is always deterministic as it simply reveals what was previously committed to in the announcement.
+We do not capture this crucial idea in the definitions since it is not important for defining security for the oracle.
+Readers should also note we intentionally leave the structure of $\eventid$ to your imagination.
+The only constraint we have on it is that it uniquely identifies a real world event and all possible valid outcomes of the event.
+
+\section{Security Definitions}
+
+
+\subsection{Attestation Unforgeability}
+
+Attestation unforgeability refers to the notion that if a valid attestation exists with respect to a particular announcement under an oracle's public key then it must have been created by that oracle.
+An attestation is only valid with respect to a particular \emph{announcement}.
+Make sure not to confuse the notion of \emph{oracle} in the sense of a DLCs with the $\AttO$ and $\AnnO$ oracles defined below which are \emph{oracles} in the sense of a security game definition.
+
+
+\begin{definition}[Attestation Unforgeability]
+  \label{oracle-attest}
+  An algorithm $\F$ $(\tau, \epsilon, n)$-breaks the unforgeability of an oracle attestation scheme $(\KeyGen, \Announce, \Attest, \Verify)$ if runs in at most time $\tau$ makes at most $n$ queries to the $\AnnO$ and $\AttO$ oracles and $\prob{\mathsf{Forge} = 1} \leq \epsilon$ in the experiment defined below.
+  \begin{mdframed}
+      \begin{pchstack}[center]
+        \procedure{$\mathsf{Forge}$}{
+        Q_{\AnnO} := \emptyset; Q_{\AttO} := \emptyset \\
+        (\sk,\pk) \sample \KeyGen \\
+        (\eventid^*, t^*, o^*) \sample \F^{\AnnO,\AttO}(\pk) \\
+        \pcreturn \\
+        \t \exists(\eventid^*, \cdot, n^*) \in Q_{\AnnO} \land \\
+        \t \exists(\eventid^*, o_j) \in Q_{\AttO} \land \\
+        \t o^* \neq o_j \land \\
+        \t \Verify(\eventid^*, n^*, t^*, o^*)
+      }
+      \pchspace
+      \procedure{ Oracle $\AnnO(\eventid_{i})$ }{
+        (r_i, \ann_i) \sample \Announce(\sk, \eventid_{i}) \\
+        Q_{\AnnO} := Q_{\AnnO} \cup \{ (\eventid_i, r_i, \ann_i)\} \\
+        \pcreturn \ann_i
+      }
+      \end{pchstack}
+      \begin{pchstack}[center]
+        \pchspace
+        \procedure{ Oracle $\AttO(\eventid_{i}, o_{i})$ }{
+        \highlightkeyword{check} \exists (\eventid_i, r_i, n_i) \in Q_{\AnnO} \land (\eventid_i, \cdot) \notin Q_{\AttO} \\
+        t_i \gets \Attest(\sk, \eventid_{i}, r_i, n_i, o_i) \\
+        Q_{\AttO} := Q_{\AttO} \cup \{ (\eventid_{i}, o_i) \} \\
+        \pcreturn \att_i \\
+        }
+        \end{pchstack}
+    \end{mdframed}
+
+    Without loss of generality we assume that $\F$ always queries $\AttO$ with an $\eventid$ if it has queried $\AnnO$ with it before returning its forgery.
+    However it may do so in any order.
+    We also assume that $\F$ only queries valid outcomes $o$ to $\AttO$ with respect to the $\eventid$.
+
+
+\end{definition}
+
+
+In Figure~\ref{dryja} we present our interpretation of Dryja's original scheme framed according to Definition~\ref{oracle-attest}.
+The scheme resembles a deconstructed version of the Schnorr signature scheme where the nonce $R$ is pre-committed to during the announcement and then the $s$ value of the signature is revealed during the attestation.
+We then go on to show that the scheme is secure if the \emph{one-more discrete logarithm problem} is hard by reduction.
+
+\begin{figure}[h]
+  \centering
+  \begin{mdframed}
+    \begin{pchstack}[center]
+    \procedure{$\KeyGen$}{
+      x \sample \ZZ_q \\
+      X \gets xG \\
+      \sk := (x, X); \pk := (X); \\
+      \pcreturn (\sk, \pk)
+    }
+    \pchspace
+    \procedure{$\Announce(\sk, \eventid)$}{
+      r \sample \ZZ_q \\
+      R \gets rG \\
+      \pcreturn (r, R)
+    }
+  \end{pchstack}
+  \begin{pchstack}[center]
+    \procedure{$\Attest(\sk, \eventid, r, \ann, o)$}{
+      (x, X) := \sk; R := n \\
+      c \gets H(R, X, \eventid, o) \\
+      s \gets r + cx \\
+      \pcreturn s
+    }
+    \pchspace
+    \procedure{$\Verify(\pk, \eventid, \ann, \att, o)$}{
+      R := n; s := t; X := \pk \\
+      c \gets H(R, X, \eventid, o) \\
+      \pcreturn R = sG - cX
+    }
+    \end{pchstack}
+  \end{mdframed}
+  \caption{Dryja's Schnorr-like oracle attestation scheme.}
+  \label{dryja}
+\end{figure}
+
+
+\newcommand{\OMDL}{\mathsf{OMDL}}
+\newcommand{\ODL}{\textsf{DLog}_G}
+\newcommand{\G}{\mathbb{G}}
+\newcommand{\e}{\varepsilon}
+
+\begin{definition}[One-More Discrete Logarithm Problem \cite{OMDL}]
+  Let $\G$ be a cyclic group of order $q$ and $G$ be a generator of $\G$ and let $\ODL$ be an oracle which returns the discrete logarithm of the queried element with respect to $G$.
+  An algorithm $\adv$ is said to $(\tau, \e, n)$-solve the OMDL problem in $\G$ if it runs in at most time $\tau$, makes at most $n$ queries to $\ODL$ and $\prob{\OMDL = 1} \geq \e$ for the $\OMDL$ experiment below.
+  \begin{center}
+  \fbox{
+    \procedure{$\OMDL$}{
+      x_0, \ldots, x_n \sample \ZZ_q^{n+1} \\
+      \pcfor i = 0, \ldots, n \pcdo \\
+      \t X_i \gets x_i G \\
+      x^*_0, \ldots, x^*_n \sample \adv^{\ODL}(X_0, \ldots, X_n) \\
+      \pcreturn (x^*_0, \ldots, x^*_n) = (x_0, \ldots , x_n)
+    }
+  }
+  \end{center}
+\end{definition}
+
+
+\newcommand{\CR}{\mathsf{cr}}
+
+\begin{theorem}[$\OMDL$ implies Attestation Unforgeability]
+  Let $H$ be the hash function that that Dryja's scheme is instantiated with.
+  Let $\F$ be a forger that $(\tau, \e, n)$-breaks the attestation unforgeability of Dryja's scheme.
+  Then there exists an adversary that $(\tau', \e', n)$-solves the $\OMDL$ problem and an adversary that $(\tau_{\CR}, \e_{\CR})$-breaks the collision resistance of $H$ such that
+
+  \[ \e \leq \e' + \e_{\CR}, \tau' = \tau + O(n), \tau_{\CR} = \tau + O(n) \]
+\end{theorem}
+\begin{proof}
+  We use a forger $\F$ against the unforgeability of Dryja's scheme to construct an adversary $\adv$ against $\OMDL$.
+  We take the first challenge group element $X_{0}$ and use it as our oracle's public key.
+  Our strategy is to then use the $\ODL$ oracle to simulate the attestation oracle $\AttO$ after first using the $X_{1}, \ldots, X_{n}$ as the announcements.
+  Once $\F$ returns a forged attestation we use it to extract the discrete logarithm of $X_{0}$ and work backwards to find the discrete logarithm of the other challenge elements.
+
+ \begin{mdframed}
+      \begin{pchstack}[center]
+        \procedure[linenumbering]{$\adv^{\ODL}(X_{0}, ..., X_{n})$}{
+          (i^*, \att^*, o^*) \sample \F^{\AnnO,\AttO}(X_0) \\
+          (\eventid^*, \att,c, o) := R_{i^*} \\
+          c^* \gets H(X_{i^*}, X_0, \eventid^*, o^*) \\
+          \pcif c = c^* \pcthen \pcabort \\
+          x_0 \gets (\att - \att^* )/(c - c^*) \\
+          \pcfor i = 1, \ldots, n \pcdo \\
+          \t (\eventid_i, \att_i,c_i, o_i) := R_i \\
+          \t x_i \gets \att_i - c_ix_0 \\
+          \pcreturn (x_0,\ldots, x_n)
+      }
+      \pchspace
+      \begin{pcvstack}
+        \procedure{ Simulate $\AnnO(\eventid_{i})$ }{
+          \ann := X_i \\
+          i = i + 1 \\
+          \pcreturn \ann
+        }
+        \pcvspace
+        \procedure{ Simulate $\AttO(\eventid_{i}, o_i)$ }{
+          c_i \gets H(X_i, X_0, \eventid_i, o_i) \\
+          S_i \gets X_i + cX_0 \\
+          \att_i \gets \ODL(S_i) \\
+          R_i := (\eventid_i, \att_i,c_i, o_i) \\
+          \pcreturn \att_i \\
+        }
+        \end{pcvstack}
+      \end{pchstack}
+    \end{mdframed}
+
+    Note that $\adv$ always solves $\OMDL$ if $\F$ breaks unforgeability except in the case the condition in line 4 causes $\adv$ to abort.
+    This can only occur if the forger has created an $\eventid$ with two different possible outcomes that hash to the same $c$ which implies $\F$ has broken the collision resistance of $H$.
+    We can therefore bound the probability of $\F$ succeeding by the difficulty of breaking collision resistance and $\OMDL$ and write $\e \leq \e' + \e_{\CR}$.
+    Since our reductions takes whatever time $\F$ takes plus the time taken to respond to $\F$'s queries we write $\tau_{\CR} = \tau + O(n)$ and $\tau' = \tau + O(n)$.
+\qed
+\end{proof}
+
+
+Apart from the security result itself the important thing to note is that it was not necessary to model the hash function $H$ as a random oracle to prove security as it is with the ordinary Schnorr scheme \cite{pointcheval2000security}.
+The hash function is required to be collision resistant but upon closer inspection it appears not to need to be a hash function at all; a collision free mapping from an outcome to an element of $\ZZ_q$ would suffice.
+This means that simply ordering the the outcomes from $o_{1},\ldots,o_{m}$ and setting $c = j$ for $o_{j}$ would yield a simpler and secure scheme that does not depend on the collision resistance of any hash function.
+The only apparent downside is that the attestation when combined with the announcement would no longer be a valid Schnorr signature but it is unclear how useful that feature is.
+
+\bibliography{bib.bib}{}
+\bibliographystyle{splncs04}
+
+\end{document}
