@@ -68,30 +68,31 @@ Make sure not to confuse the notion of \emph{oracle} in the sense of a DLCs with
 
 \begin{definition}[Attestation Unforgeability]
   \label{oracle-attest}
-  An algorithm $\F$ $(\tau, \epsilon, n)$-breaks the unforgeability of an oracle attestation scheme $(\KeyGen, \Announce, \Attest, \Verify)$ if runs in at most time $\tau$ makes at most $n$ queries to the $\AnnO$ and $\AttO$ oracles and $\prob{\mathsf{Forge} = 1} \leq \epsilon$ in the experiment defined below.
+  An algorithm $\F$ $(\tau, \epsilon, n)$-breaks the unforgeability of an oracle attestation scheme $(\KeyGen, \Announce, \Attest, \Verify)$ if runs in at most time $\tau$ makes at most $n$ queries to the $\AnnO$ and $\AttO$ oracles and $\prob{\mathsf{Forge} = 1} \geq \epsilon$ in the experiment defined below.
   \begin{mdframed}
       \begin{pchstack}[center]
         \procedure{$\mathsf{Forge}$}{
-        Q_{\AnnO} := \emptyset; Q_{\AttO} := \emptyset \\
+        i \gets 1; Q_{\AnnO} := \emptyset; Q_{\AttO} := \emptyset \\
         (\sk,\pk) \sample \KeyGen \\
-        (\eventid^*, t^*, o^*) \sample \F^{\AnnO,\AttO}(\pk) \\
+        (i^*, \att^*, o^*) \sample \F^{\AnnO,\AttO}(\pk) \\
         \pcreturn \\
-        \t \exists(\eventid^*, \cdot, \ann^*) \in Q_{\AnnO} \land \\
-        \t \exists(\eventid^*, o_j) \in Q_{\AttO} \land \\
-        \t o^* \neq o_j \land \\
+        \t \exists(i^*, \eventid^*, \cdot, \ann^*) \in Q_{\AnnO} \land \\
+        \t \exists(\eventid^*, o) \in Q_{\AttO} \land \\
+        \t o^* \neq o \land \\
         \t \Verify(\eventid^*, \ann^*, t^*, o^*)
       }
       \pchspace
       \procedure{ Oracle $\AnnO(\eventid_{i})$ }{
         (r_i, \ann_i) \sample \Announce(\sk, \eventid_{i}) \\
-        Q_{\AnnO} := Q_{\AnnO} \cup \{ (\eventid_i, r_i, \ann_i)\} \\
+        Q_{\AnnO} := Q_{\AnnO} \cup \{ (i, \eventid_i, r_i, \ann_i)\} \\
+        i \gets i + 1 \\
         \pcreturn \ann_i
       }
       \end{pchstack}
       \begin{pchstack}[center]
         \pchspace
         \procedure{ Oracle $\AttO(\eventid_{i}, o_{i})$ }{
-        \highlightkeyword{check} \exists (\eventid_i, r_i, \ann_i) \in Q_{\AnnO} \land (\eventid_i, \cdot) \notin Q_{\AttO} \\
+        \highlightkeyword{check} \exists (i, \eventid_i, r_i, \ann_i) \in Q_{\AnnO} \land (\eventid_i, \cdot) \notin Q_{\AttO} \\
         \att_i \gets \Attest(\sk, \eventid_{i}, r_i, \ann_i, o_i) \\
         Q_{\AttO} := Q_{\AttO} \cup \{ (\eventid_{i}, o_i) \} \\
         \pcreturn \att_i \\
@@ -106,6 +107,7 @@ Make sure not to confuse the notion of \emph{oracle} in the sense of a DLCs with
 
 \end{definition}
 
+\section{Dryja's Scheme}
 
 In Figure~\ref{dryja} we present our interpretation of Dryja's original scheme framed according to Definition~\ref{oracle-attest}.
 The scheme resembles a deconstructed version of the Schnorr signature scheme where the nonce $R$ is pre-committed to during the announcement and then the $s$ value of the signature is revealed during the attestation.
@@ -132,14 +134,14 @@ We then go on to show that the scheme is secure if the \emph{one-more discrete l
     \procedure{$\Attest(\sk, \eventid, r, \ann, o)$}{
       (x, X) := \sk; R := \ann \\
       c \gets H(R, X, \eventid, o) \\
-      s \gets r + cx \\
-      \pcreturn s
+      \att \gets r + cx \\
+      \pcreturn \att
     }
     \pchspace
     \procedure{$\Verify(\pk, \eventid, \ann, \att, o)$}{
-      R := \ann; s := \att; X := \pk \\
+      X := \pk; R := \ann \\
       c \gets H(R, X, \eventid, o) \\
-      \pcreturn R = sG - cX
+      \pcreturn R = \att{}G - cX
     }
     \end{pchstack}
   \end{mdframed}
@@ -148,14 +150,14 @@ We then go on to show that the scheme is secure if the \emph{one-more discrete l
 \end{figure}
 
 
-\newcommand{\OMDL}{\mathsf{OMDL}}
+\newcommand{\OMDL}{n\mathsf{-OMDL}}
 \newcommand{\ODL}{\textsf{DLog}_G}
 \newcommand{\G}{\mathbb{G}}
 \newcommand{\e}{\varepsilon}
 
 \begin{definition}[One-More Discrete Logarithm Problem \cite{OMDL}]
   Let $\G$ be a cyclic group of order $q$ and $G$ be a generator of $\G$ and let $\ODL$ be an oracle which returns the discrete logarithm of the queried element with respect to $G$.
-  An algorithm $\adv$ is said to $(\tau, \e, n)$-solve the OMDL problem in $\G$ if it runs in at most time $\tau$, makes at most $n$ queries to $\ODL$ and $\prob{\OMDL = 1} \geq \e$ for the $\OMDL$ experiment below.
+  An algorithm $\adv$ is said to $(\tau, \e)$-solve the $n$-OMDL problem in $\G$ if it runs in at most time $\tau$, makes at most $n$ queries to $\ODL$ and $\prob{\OMDL = 1} \geq \e$ for the $\OMDL$ experiment below.
   \begin{center}
   \fbox{
     \procedure{$\OMDL$}{
@@ -173,9 +175,10 @@ We then go on to show that the scheme is secure if the \emph{one-more discrete l
 \newcommand{\CR}{\mathsf{cr}}
 
 \begin{theorem}[$\OMDL$ implies Attestation Unforgeability]
+  \label{theorem-unforge}
   Let $H$ be the hash function that that Dryja's scheme is instantiated with.
   Let $\F$ be a forger that $(\tau, \e, n)$-breaks the attestation unforgeability of Dryja's scheme.
-  Then there exists an adversary that $(\tau', \e', n)$-solves the $\OMDL$ problem and an adversary that $(\tau_{\CR}, \e_{\CR})$-breaks the collision resistance of $H$ such that
+  Then there exists an adversary that $(\tau', \e')$-solves the $n$-OMDL problem and an adversary that $(\tau_{\CR}, \e_{\CR})$-breaks the collision resistance of $H$ such that
 
   \[ \e \leq \e' + \e_{\CR}, \tau' = \tau + O(n), \tau_{\CR} = \tau + O(n) \]
 \end{theorem}
@@ -188,21 +191,22 @@ We then go on to show that the scheme is secure if the \emph{one-more discrete l
  \begin{mdframed}
       \begin{pchstack}[center]
         \procedure[linenumbering]{$\adv^{\ODL}(X_{0}, ..., X_{n})$}{
+          i \gets 1 \\
           (i^*, \att^*, o^*) \sample \F^{\AnnO,\AttO}(X_0) \\
-          (\eventid^*, \att,c, o) := R_{i^*} \\
+          (\eventid^*, \att,c, o) := Q_{i^*} \\
           c^* \gets H(X_{i^*}, X_0, \eventid^*, o^*) \\
           \pcif c = c^* \pcthen \pcabort \\
           x_0 \gets (\att - \att^* )/(c - c^*) \\
-          \pcfor i = 1, \ldots, n \pcdo \\
-          \t (\eventid_i, \att_i,c_i, o_i) := R_i \\
-          \t x_i \gets \att_i - c_ix_0 \\
+          \pcfor j = 1, \ldots, n \pcdo \\
+          \t (\eventid_j, \att_j,c_j, o_j) := Q_j \\
+          \t x_j \gets \att_j - c_jx_0 \\
           \pcreturn (x_0,\ldots, x_n)
       }
       \pchspace
       \begin{pcvstack}
         \procedure{ Simulate $\AnnO(\eventid_{i})$ }{
           \ann_i := X_i \\
-          i = i + 1 \\
+          i \gets i + 1 \\
           \pcreturn \ann_i
         }
         \pcvspace
@@ -210,7 +214,7 @@ We then go on to show that the scheme is secure if the \emph{one-more discrete l
           c_i \gets H(X_i, X_0, \eventid_i, o_i) \\
           S_i \gets X_i + cX_0 \\
           \att_i \gets \ODL(S_i) \\
-          R_i := (\eventid_i, \att_i,c_i, o_i) \\
+          Q_i := (\eventid_i, \att_i,c_i, o_i) \\
           \pcreturn \att_i \\
         }
         \end{pcvstack}
@@ -225,10 +229,45 @@ We then go on to show that the scheme is secure if the \emph{one-more discrete l
 \end{proof}
 
 
-Apart from the security result itself the important thing to note is that it was not necessary to model the hash function $H$ as a random oracle to prove security as it is with the ordinary Schnorr scheme \cite{pointcheval2000security}.
-The hash function is required to be collision resistant but upon closer inspection it appears not to need to be a hash function at all; a collision free mapping from an outcome to an element of $\ZZ_q$ would suffice.
-This means that simply ordering the the outcomes from $o_{1},\ldots,o_{m}$ and setting $c = j$ for $o_{j}$ would yield a simpler and secure scheme that does not depend on the collision resistance of any hash function.
-The only apparent downside is that the attestation when combined with the announcement would no longer be a valid Schnorr signature but it is unclear how useful that feature is.
+We note that technically collision resistance is not strictly necessary to prove security.
+Reaching the collision condition is intractable since $\F$ has to choose the $\eventid$ and therefore the possible values of $o$ before querying $\AnnO$.
+The oracle then gets to randomly choose the prefix of pre-image ($R$ in Figure~\ref{dryja}) which naturally thwarts attempts to contrive a set of outcomes that results in a collision.
+We leave clearing up this technicality to future revision.
+
+
+\section{A Simpler Scheme}
+\newcommand{\ord}{\mathsf{ord}}
+
+Observe that in the proof in the previous section it was not necessary to model the hash function $H$ as a random oracle to prove security as it is with the ordinary Schnorr scheme \cite{pointcheval2000security}.
+Upon closer inspection it appears producing $c$ need not be done with a hash function at all; any collision free mapping from an outcome to an element of $\ZZ_q$ would suffice.
+The most convenient modification would replacing each invocation of the hash $H(R, X, \eventid, o)$  with $\ord(\eventid,o)$ in Figure~\ref{dryja} where $\ord$ simply returns the index of the outcome $o$ in $\eventid$ e.g. 0 for the first outcome and 1 for the second etc.
+Crucially, the proof for Theorem~\ref{theorem-unforge} would hold as all that is required is to guarantee unforgeability is that $c \neq c^*$ when $o \neq o^{*}$.
+This is clearly unconditionally guaranteed by setting $c \gets \ord(\eventid, o)$.
+
+\begin{figure}[h]
+  \centering
+  \begin{mdframed}
+\begin{pchstack}[center]
+    \procedure{$\Attest(\sk, \eventid, r, \ann, o)$}{
+      (x, X) := \sk; R := \ann \\
+      c \gets \ord(\eventid, o) \\
+      \att \gets r + cx \\
+      \pcreturn \att
+    }
+    \pchspace
+    \procedure{$\Verify(\pk, \eventid, \ann, \att, o)$}{
+      X := \pk; R := \ann \\
+      c \gets \ord(\eventid, o) \\
+      \pcreturn R = \att{}G - cX
+    }
+    \end{pchstack}
+    \end{mdframed}
+    \caption{A simplification of the attestation scheme in Figure~\ref{dryja} where the hash function is replaced by $\ord$ which returns the index of the outcome in the event.}
+\end{figure}
+
+
+The only apparent downside of this idea is that the attestation when combined with the announcement would no longer be a valid Schnorr signature.
+It is unclear how useful that feature is in practice.
 
 \bibliography{bib.bib}{}
 \bibliographystyle{splncs04}
