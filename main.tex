@@ -11,14 +11,16 @@
 \institute{\email{lloyd.fourn@gmail.com}}
 \date{February 2021}
 
-\newcommand{\eventid}{\mathtt{event\_id}}
+\newcommand{\eventid}{\mathtt{id}}
 \newcommand{\KeyGen}{\mathsf{KeyGen}}
 \newcommand{\Verify}{\mathsf{Verify}}
 \newcommand{\Announce}{\mathsf{Announce}}
 \newcommand{\Attest}{\mathsf{Attest}}
 \newcommand{\AnnO}{\mathsf{Ann}}
 \newcommand{\AttO}{\mathsf{Att}}
+\newcommand{\Anticipate}{\mathsf{Anticipate}}
 \newcommand{\att}{t}
+\newcommand{\Att}{T}
 \newcommand{\ann}{a}
 \newcommand{\rightsample}{\hskip2.3pt{\mbox{\tiny${\$}$\normalsize}}\!\!\rightarrow\,}
 \newcommand{\F}{\mathcal{F}}
@@ -29,12 +31,11 @@
 
 \section{Introduction}
 
-In \emph{Discreet Log Contracts}\cite{DLC}, Dryja presents a compelling design for Bitcoin based smart contracts that settle based on real world events.
+In \emph{Discreet Log Contracts}\cite{dlc}, Dryja presents a compelling design for Bitcoin based smart contracts that settle based on real world events.
 The real world outcome of an event is mapped into Bitcoin transactions through entities called \emph{oracles} who provide a cryptographic attestation to a particular outcome.
-
 In this short work we provide security definitions and proofs that were absent from the original work.
 Furthermore, we remark that the scheme can be simplified and achieve the same security properties without assuming a collision resistant hash function.
-This work is unfinished and so far only covers the notion of attestation unforgeability.
+This work is unfinished and so far only formally covers the notion of attestation unforgeability.
 
 
 \begin{definition}[Oracle Attestation Scheme]
@@ -44,27 +45,28 @@ This work is unfinished and so far only covers the notion of attestation unforge
     \item $\KeyGen(\cdot) \rightsample (\sk, \pk)$: A key generation algorithm
     \item $\Announce(\sk, \eventid) \rightsample (r,\ann)$: An event announcement algorithm which the oracle uses to generate an announcement secret $r$ and an announcement $\ann$.
     \item $\Attest(\sk, \eventid, r, \ann, o) \rightarrow \att$: An event outcome attestation algorithm which the oracle uses to publicly attest to the fact that an event identified previously announced with $\ann$ has has the outcome $o$.
+    \item $\Anticipate(\pk, \eventid, \ann, o) \rightarrow \Att$: A attestation anticipation scheme which returns an image $\Att$ of the eventual attestation for a particular outcome $o$.
     \item $\Verify(\pk, \eventid, \ann, \att, o) \rightarrow \bin$: An attestation verification algorithm which verifies that an attestation $\att$ attests to $o$ being the outcome of an event with announcement $\ann$ under the oracle's public key $\pk$.
   \end{itemize}
 
 \end{definition}
 
-It's important to note that the above definition does not provide an intuition as to why an oracle attestation scheme is useful.
-Users have to be able to use the announcement $\ann$ to anticipate some form of the final attestation for each particular outcome and use it to lock funds on the ledger such that the revelation of the corresponding attestation $\att$ will have the desired effect.
-This is why $\Attest$ is always deterministic as it simply reveals what was previously committed to in the announcement.
-We do not capture this crucial idea in the definitions since it is not important for defining security for the oracle.
-Readers should also note we intentionally leave the structure of $\eventid$ to your imagination.
-The only constraint we have on it is that it uniquely identifies a real world event and all possible valid outcomes of the event.
+The workflow of an oracle attestation scheme is for the oracle to first invoke $\Announce$ and publish the resulting announcement.
+Users use $\Anticipate$ to produce some kind of image of the eventual attestation i.e. a group element $\Att = \att{}G$ where $\att$ is the final attestation scheme.
+They use this to condition the release of coins to each other based on the revelation of one or another attestation by the oracle.
+The oracle finally decides the outcome $o$ of the event and computes the corresponding attestation $\att$ and publishes $(o,\att)$.
+The users then use $\att$ to release the coins they are due upon $o$ being the outcome.
+Since we do not actually model the protocol users use to lock funds we define $\Verify$ to capture the condition under which an attestation is valid since it is convenient for our security definitions but users would not necessarily ever execute $\Verify$ in the real world.
 
 \section{Security Definitions}
-
 
 \subsection{Attestation Unforgeability}
 
 Attestation unforgeability refers to the notion that if a valid attestation exists with respect to a particular announcement under an oracle's public key then it must have been created by that oracle.
 An attestation is only valid with respect to a particular \emph{announcement}.
+In the real world we assume that announcements are signed under a different key (also known to belong to the oracle) so that each user can verify an announcement did indeed come from an oracle before using it.
+Forcing announcements to be signed under the attestation key would needlessly complicate the security analysis since it would also give us the extra task of proving that the announcement signature scheme remains unforgeable when composed with an attestation scheme.
 Make sure not to confuse the notion of \emph{oracle} in the sense of a DLCs with the $\AttO$ and $\AnnO$ oracles defined below which are \emph{oracles} in the sense of a security game definition.
-
 
 \begin{definition}[Attestation Unforgeability]
   \label{oracle-attest}
@@ -74,12 +76,12 @@ Make sure not to confuse the notion of \emph{oracle} in the sense of a DLCs with
         \procedure{$\mathsf{Forge}$}{
         i \gets 1; Q_{\AnnO} := \emptyset; Q_{\AttO} := \emptyset \\
         (\sk,\pk) \sample \KeyGen \\
-        (i^*, \att^*, o^*) \sample \F^{\AnnO,\AttO}(\pk) \\
+        (i^*, \att^*, o^*m, \ann^*) \sample \F^{\AnnO,\AttO}(\pk) \\
         \pcreturn \\
         \t \exists(i^*, \eventid^*, \cdot, \ann^*) \in Q_{\AnnO} \land \\
         \t \exists(\eventid^*, o) \in Q_{\AttO} \land \\
         \t o^* \neq o \land \\
-        \t \Verify(\eventid^*, \ann^*, t^*, o^*)
+        \t \Verify(\pk, \eventid^*, \ann^*, \att^*, o^*)
       }
       \pchspace
       \procedure{ Oracle $\AnnO(\eventid_{i})$ }{
@@ -102,10 +104,12 @@ Make sure not to confuse the notion of \emph{oracle} in the sense of a DLCs with
 
     Without loss of generality we assume that $\F$ always queries $\AttO$ with an $\eventid$ if it has queried $\AnnO$ with it before returning its forgery.
     However it may do so in any order.
-    We also assume that $\F$ only queries valid outcomes $o$ to $\AttO$ with respect to the $\eventid$.
-
-
+    We allow the outcome $o$ queried to $\AttO$ to be any string.
 \end{definition}
+
+Note that in reality $o$ cannot be any string but must be part of a set determined by the $\eventid$.
+Primarily, we give the adversary the extra power to choose an arbitrary string because it is simpler not to have to reason about how the constrained outcome space affects the analysis.
+Secondarily, it extends the security model's guarantees to an attestation hardware device that cannot verify what is and is not a semantically valid outcome for a particular $\eventid$.
 
 \section{Dryja's Scheme}
 
@@ -129,13 +133,18 @@ We then go on to show that the scheme is secure if the \emph{one-more discrete l
       R \gets rG \\
       \pcreturn (r, R)
     }
-  \end{pchstack}
-  \begin{pchstack}[center]
     \procedure{$\Attest(\sk, \eventid, r, \ann, o)$}{
       (x, X) := \sk; R := \ann \\
       c \gets H(R, X, \eventid, o) \\
       \att \gets r + cx \\
       \pcreturn \att
+    }
+  \end{pchstack}
+  \begin{pchstack}[center]
+    \procedure{$\Anticipate(\pk, \eventid, \ann, \att, o)$}{
+        X := \pk; R := \ann \\
+        c \gets H(R, X, \eventid, o) \\
+        \pcreturn R + cX
     }
     \pchspace
     \procedure{$\Verify(\pk, \eventid, \ann, \att, o)$}{
@@ -171,7 +180,6 @@ We then go on to show that the scheme is secure if the \emph{one-more discrete l
   \end{center}
 \end{definition}
 
-
 \newcommand{\CR}{\mathsf{cr}}
 
 \begin{theorem}[$\OMDL$ implies Attestation Unforgeability]
@@ -192,7 +200,7 @@ We then go on to show that the scheme is secure if the \emph{one-more discrete l
       \begin{pchstack}[center]
         \procedure[linenumbering]{$\adv^{\ODL}(X_{0}, ..., X_{n})$}{
           i \gets 1 \\
-          (i^*, \att^*, o^*) \sample \F^{\AnnO,\AttO}(X_0) \\
+          (i^*, \ann^*, \att^*, o^*) \sample \F^{\AnnO,\AttO}(X_0) \\
           (\eventid^*, \att,c, o) := Q_{i^*} \\
           c^* \gets H(X_{i^*}, X_0, \eventid^*, o^*) \\
           \pcif c = c^* \pcthen \pcabort \\
@@ -223,23 +231,20 @@ We then go on to show that the scheme is secure if the \emph{one-more discrete l
 
     Note that $\adv$ always solves $\OMDL$ if $\F$ breaks unforgeability except in the case the condition in line 4 causes $\adv$ to abort.
     This can only occur if the forger has created an $\eventid$ with two different possible outcomes that hash to the same $c$ which implies $\F$ has broken the collision resistance of $H$.
-    We can therefore bound the probability of $\F$ succeeding by the difficulty of breaking collision resistance in addition $\OMDL$ and write $\e \leq \e' + \e_{\CR}$.
+    We can therefore bound the probability of $\F$ succeeding by the difficulty of breaking collision resistance in addition to $\OMDL$ and write $\e \leq \e' + \e_{\CR}$.
     Since our reductions takes whatever time $\F$ takes plus the time taken to respond to $\F$'s queries we write $\tau_{\CR} = \tau + O(n)$ and $\tau' = \tau + O(n)$.
 \qed
 \end{proof}
 
-
-We note that technically collision resistance is not strictly necessary to prove security.
-Reaching the collision condition is intractable since $\F$ has to choose the $\eventid$ and therefore the possible values of $o$ before querying $\AnnO$.
-The oracle then gets to randomly choose the prefix of pre-image ($R$ in Figure~\ref{dryja}) which naturally thwarts attempts to contrive a set of outcomes that results in a collision.
-We leave clearing up this technicality to future revision.
+It is important to note that the extra collision resistance requirement is not strictly necessary because it is an artefact of giving the adversary the power to choose any arbitrary string as the outcome after seeing the announcement.
 
 
 \section{A Simpler Scheme}
+\label{simple}
 \newcommand{\ord}{\mathsf{ord}}
 
 Observe that in the proof in the previous section it was not necessary to model the hash function $H$ as a random oracle to prove security as it is with the ordinary Schnorr scheme \cite{pointcheval2000security}.
-Upon closer inspection it appears producing $c$ need not be done with a hash function at all; any collision free mapping from an outcome to an element of $\ZZ_q$ would suffice.
+Upon closer inspection it appears producing $c$ need not be done with a hash function at all; any injective (collision-fee) mapping from outcomes to to $\ZZ_q$ would suffice.
 The most convenient modification would replacing each invocation of the hash $H(R, X, \eventid, o)$  with $\ord(\eventid,o)$ in Figure~\ref{dryja} where $\ord$ simply returns the index of the outcome $o$ in $\eventid$ e.g. 0 for the first outcome and 1 for the second etc.
 Crucially, the proof for Theorem~\ref{theorem-unforge} would hold as all that is required is to guarantee unforgeability is that $c \neq c^*$ when $o \neq o^{*}$.
 This is clearly unconditionally guaranteed by setting $c \gets \ord(\eventid, o)$.
@@ -267,7 +272,141 @@ This is clearly unconditionally guaranteed by setting $c \gets \ord(\eventid, o)
 
 
 The only apparent downside of this idea is that the attestation when combined with the announcement would no longer be a valid Schnorr signature.
-It is unclear how useful that feature is in practice.
+However, note that just because valid Schnorr signatures result from the scheme in Figure~\ref{dryja} does not mean that the signatures are unforgeable.
+In the standard proof of \emph{existential unforgeability under chosen message attack} \cite{pointcheval2000security} the message is presented to the honest signer before it chooses the nonce $R$.
+In our case here the exact message is unknown when the honest signer chooses $R$ which means the proof does not apply.
+
+\section{Oracle Aggregation Security}
+
+% \newcommand{\kagg}{\testsf{KeyAgg}}
+% \newcommand{\annagg}{\testsf{AnnAgg}}
+% \newcommand{\attagg}{\testsf{AnnAgg}}
+\newcommand{\AggAnticipate}{\textsf{AggAnticipate}}
+\newcommand{\AggAttest}{\textsf{AggAttest}}
+
+An obvious question is whether a user can securely combine $n$ oracles into an aggregate oracle such that they can only obtain an attestation from the aggregate oracle if each component oracle attests to the particular outcome on a particular event.
+The user should be able to do this without the oracles interacting with each other or even being aware of each other.
+The most straightforward reason to do this is to make sure several oracles agree on the outcome of an event so that one corrupt oracle is not enough to affirm the outcome.
+Furthermore it could be useful to combine unrelated events into a single cryptographic condition.
+For example, Bob may wish to combine the conditions of ``The Democrats will win the election and it will be raining in Shanghai on March 1st''.
+We wish to preserve security if he uses the same oracle for both events or different ones.
+
+To incorporate this functionality we extend the definition in Figure~\ref{oracle-attest} with the following algorithms:
+
+\begin{itemize}
+        \item $\AggAnticipate((\pk_{1}, \eventid_{1}, \ann_{1}, o_{1}), \ldots, (\pk_{n}, \eventid_{n}, \ann_{n}, o_{n}))  \rightarrow \Att$: A deterministic aggregate anticipation algorithm that returns the anticipated attestation for a set of announcements.
+        \item $\AggAttest(\att_{1},\ldots,\att_{n}) \rightarrow \att$: A deterministic attestation combination algorithm which combines a set of attestations into an aggregate attestation $t$.
+\end{itemize}
+
+In \cite{dlc} it is suggested to extend the scheme in Figure~\ref{dryja} by simply adding the anticipation points and attestation scalars from single oracle schemes as shown in Figure~\ref{dryja-agg}.
+
+\begin{figure}[h]
+  \label{dryja-agg}
+  \centering
+\begin{mdframed}
+      \begin{pcvstack}
+        \procedure{$\AggAnticipate((\pk_{1}, \eventid_{1}, \ann_{1}, o_{1}), \ldots, (\pk_{n}, \eventid_{n}, \ann_{n}, o_{n}))$}{
+          \pcreturn \Sigma_{i=1}^{n} \Anticipate(\pk_i, \eventid_i, \ann_i, o_i)
+        }
+
+        \pcvspace
+        \procedure{$\AggAttest(\att_{1},\ldots,\att_{n})$}{
+          \pcreturn \Sigma_{i=1}^{n} \att_i
+        }
+        \end{pcvstack}
+\end{mdframed}
+\caption{The oracle aggregation scheme from \cite{dlc}.}
+\end{figure}
+
+
+Unfortunately the scheme above is insecure as it was originally presented.
+A malicious oracle after seeing another oracle's announcement may contrive their own announcement to \emph{cancel out} the attestation of the other so that oracle alone has the power to settle the bet.
+Observe that if the honest oracle's anticipated attestation on an outcome $o_{1}$ is $R_{1}$ and their anticipation point is $\Att_{1} = R_{1} + H(R_{1} || X_{1} || \eventid || o_{1})X_{1}$ then a malicious oracle with key $X_{1}$ can set their announcement $R_{2} = R^{'}_{2} - \Att_{1}$ where $R^{'}_{2} = r^{'}_{2}G$ for some randomly selected $r^{'}_{2}$.
+This cancels out the honest oracle's contribution to attestation completely as follows:
+
+\begin{align*}
+\AggAnticipate((X_{1}, \eventid_{1}, R_{1}, o_{1}), (X_{2}, \eventid_{2}, R_{2}, o_{2})) & =  \Att_{1} + \Att_{2} \\
+& = R^{'}_{2} + H(R_{2} || X_{2} || \eventid_2 || o_{1})X_{2}
+\end{align*}
+
+Clearly the the malicious oracle can now reveal the combined attestation as $r'_{2} + H(R_{2}||X_{2}||id_{2}|| o_{2})x_{2}$.
+In this case we can apply the the \emph{knowledge of secret key} model (KOSK) \cite{kosk} where in the real executions oracles include a proof of knowledge for their nonce in the announcement.
+Then, given that the malicious oracle has proven knowledge of $R_{2}$ we give our security reduction $r_{2}$ such that $R_{2} = r_{2}G$.
+Note carefully that the malicious oracle does not know $r_{2}$, the secret key for $R_{2}$, in the above example and so would be unable to produce the proof.
+We leave it to a future revision to properly define security for the oracle aggregation scheme and prove that in the KOSK model the oracle aggregation scheme is secure.
+
+\section{Multi-Party Attestation}
+\newcommand{\MultiKeyGen}{\textsf{MultiKeyGen}}
+\newcommand{\MultiAnnounce}{\textsf{MultiAnnounce}}
+\newcommand{\MultiAttest}{\textsf{MultiAttest}}
+
+An oracle may wish to split up the responsibility of attesting under its public key to multiple parties so that they all must be corrupted to get the oracle to attest to an invalid outcome.
+For example, one key may be given to a system that uses the web to scrape the web to produce the outcome while another may require a human to manually sign the outcome.
+To the outside world this oracle should appear as a single oracle.
+
+The most straightforward way to do this with Dryja's scheme would be to take each party's key $X_{1},\ldots, X_{n}$ and aggregate them using a Schnorr multi-signature scheme to get the combined oracle's key.
+Unfortunately, just as in the single oracle case, doing this breaks the unforgeability proof most existing Schnorr multi-signature schemes.
+The reason for this is that each party must also generate their component of the announcement and aggregate them into a single announcement.
+In the case of Dryja's scheme this means declaring the Schnorr nonce $R$ up front by computing it somehow from the component nonces.
+This breaks the unforgeability proof for for example MuSig\cite{musig} because it requires that the adversary does not know $R$ before the choosing the message to receive a signature on.
+Although MuSig2\cite{musig2} actually does allow pre-generating public nonce data in the case of multi-signatures it does not allow computing the final nonce $R$ until the message is known and so cannot be applied here either.
+We note that the robust MuSig-DN\cite{musig-dn} would circumvent this problem and would work at the cost of its complexity.
+
+Just as in the single oracle case it is likely the theoretical problems with the MuSig proof could be remedied by forcing the adversary to fix the list of outcomes at announcement time.
+We will not dwell on this point because the fact that signatures could be forged does not actually mean it is an insecure multi-party attestation scheme.
+In a future revision we hope to formally prove the security of a mult-party attestation scheme without reference to Schnorr multi-signature schemes.
+% \newcommand{\mAttO}{\mathsf{mAtt}}
+% \newcommand{\mAnnO}{\mathsf{mAnn}}
+
+% \begin{proof}
+%   We use a forger $\F$ against the multi-party unforgeability of Dryja's scheme to construct an adversary $\adv$ against $\OMDL$.
+%   Just as in the single oracle case we take the first challenge group element $X_{0}$ and use it as our oracle's public key and then use the remaining elements $X_{1}, \ldots, X_{n}$ as the announcements when simulating the $\mAnnO$ oracle and finally use our $\ODL$ oracle to simulate the $\mAttO$ oracle to the forger.
+%   Once $\F$ returns a forged attestation under a previous announcement we use the nonce secret keys $r^{*}_{1},\ldots,r^{*}_{n}$ that have access to in the KOSK model to extract $x_{0}$.
+%   With $x_{0}$ in hand we can work backwards just as in the single oracle case to obtain $x_{1},\ldots,x_{n}$ and therefore output the $\OMDL$ solution.
+
+%  \begin{mdframed}
+%       \begin{pchstack}[center]
+%         \procedure[linenumbering]{$\adv^{\ODL}(X_{0}, ..., X_{n})$}{
+%           i \gets 1 \\
+%           (i^*, \att^*, o^*) \sample \F^{\AnnO,\AttO}(X_0) \\
+%           (\eventid^*, \ann^*, \att,c, o) := Q_{i^*} \\
+%           \pccomment{We know $r_{i}$ in KOSK model} \\
+%           ((R^*_1,r^*_1),\ldots, (R^*_n, r^*_n)) := \ann^* \\
+%           c^* \gets H(X_{i^*}, X_0, \eventid^*, o^*) \\
+%           \pcif c = c^* \pcthen \pcabort \\
+%           x_0 \gets (\att - \att^* - \Sigma{i}^n r_i )/(c - c^*) \\
+%           \pcfor j = 1, \ldots, n \pcdo \\
+%           \t (\eventid_j, \att_j,c_j, o_j) := Q_j \\
+%           \t x_j \gets \att_j - c_jx_0 \\
+%           \pcreturn (x_0,\ldots, x_n)
+%       }
+%       \pchspace
+%       \begin{pcvstack}
+%         \procedure{ Simulate $\mAnnO(\eventid_{i})$ }{
+%           \ann_i := X_i \\
+%           i \gets i + 1 \\
+%           \pcreturn \ann_i
+%         }
+%         \pcvspace
+%         \procedure{ Simulate $\mAttO(\eventid_{i}, o_i, \ann_{i})$ }{
+%           c_i \gets H(X_i, X_0, \eventid_i, o_i) \\
+%           S_i \gets X_i + cX_0 \\
+%           \att_i \gets \ODL(S_i) \\
+%           Q_i := (\eventid_i, \att_i,c_i, o_i) \\
+%           \pcreturn \att_i \\
+%         }
+%         \end{pcvstack}
+%       \end{pchstack}
+%     \end{mdframed}
+
+%     Note that $\adv$ always solves $\OMDL$ if $\F$ breaks unforgeability except in the case the condition in line 4 causes $\adv$ to abort.
+%     This can only occur if the forger has created an $\eventid$ with two different possible outcomes that hash to the same $c$ which implies $\F$ has broken the collision resistance of $H$.
+%     We can therefore bound the probability of $\F$ succeeding by the difficulty of breaking collision resistance in addition $\OMDL$ and write $\e \leq \e' + \e_{\CR}$.
+%     Since our reductions takes whatever time $\F$ takes plus the time taken to respond to $\F$'s queries we write $\tau_{\CR} = \tau + O(n)$ and $\tau' = \tau + O(n)$.
+% \qed
+% \end{proof}
+
+
 
 \bibliography{bib.bib}{}
 \bibliographystyle{splncs04}
