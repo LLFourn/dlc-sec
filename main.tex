@@ -76,7 +76,7 @@ Make sure not to confuse the notion of \emph{oracle} in the sense of a DLCs with
         \procedure{$\mathsf{Forge}$}{
         i \gets 1; Q_{\AnnO} := \emptyset; Q_{\AttO} := \emptyset \\
         (\sk,\pk) \sample \KeyGen \\
-        (i^*, \att^*, o^*m, \ann^*) \sample \F^{\AnnO,\AttO}(\pk) \\
+        (i^*, \ann^*, \att^*, o^*) \sample \F^{\AnnO,\AttO}(\pk) \\
         \pcreturn \\
         \t \exists(i^*, \eventid^*, \cdot, \ann^*) \in Q_{\AnnO} \land \\
         \t \exists(\eventid^*, o) \in Q_{\AttO} \land \\
