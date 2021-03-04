@@ -51,7 +51,7 @@ This work is unfinished and so far only formally covers the notion of attestatio
 \end{definition}
 
 The workflow of an oracle attestation scheme starts with the oracle invoking $\Announce$ and publishing the resulting announcement.
-Users use $\Anticipate$ to produce some kind of image of the eventual attestation i.e. a group element $\Att = \att{}G$ where $\att$ would be the final attestation for a particular outcome.
+Users input the announcement into $\Anticipate$ to produce a (protocol specific) image of the eventual attestation, for example, a group element $\Att = \att{}G$ where $\att$ would be the final attestation for a particular outcome.
 They use this to condition the release of different quantities of coins to each other depending on which value of $\att$ is finally revealed.
 When the oracle decides the outcome $o$ of the event, they compute the corresponding attestation $\att$ and publish $(o,\att)$.
 The users then use $\att$ to release the coins they are due upon $o$ being the outcome.
