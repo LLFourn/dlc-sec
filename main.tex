@@ -248,10 +248,10 @@ If we remove this power from the adversary then the scheme is likely secure unde
 \label{simple}
 \newcommand{\ord}{\mathsf{ord}}
 
-Observe that in the proof in the previous section it was not necessary to model the hash function $H$ as a random oracle to prove security as it is with the ordinary Schnorr scheme \cite{pointcheval2000security}.
+Observe that we did not need to model the hash function $H$ as a random oracle in the proof in the previous section.
 Upon closer inspection it appears producing $c$ need not be done with a hash function at all; any injective (collision-fee) mapping from outcomes to to $\ZZ_q$ would suffice.
-The most convenient modification would replacing each invocation of the hash $H(R, X, \eventid, o)$  with $\ord(\eventid,o)$ in Figure~\ref{dryja} where $\ord$ simply returns the index of the outcome $o$ in $\eventid$ e.g. 0 for the first outcome and 1 for the second etc.
-Crucially, the proof for Theorem~\ref{theorem-unforge} would hold as all that is required is to guarantee unforgeability is that $c \neq c^*$ when $o \neq o^{*}$.
+A convenient alternative to getting $c$ from $H(R, X, \eventid, o)$ as in Figure~\ref{dryja} is to set it to $\ord(\eventid,o)$ as shown in Figure~\ref{replace-ord} where $\ord$ simply returns the index of the outcome $o$ in $\eventid$ e.g. 0 for the first outcome and 1 for the second etc.
+Crucially, the proof for Theorem~\ref{theorem-unforge} continues to hold for this modification as all that it requires is that $c \neq c^*$ when $o \neq o^{*}$.
 This is clearly unconditionally guaranteed by setting $c \gets \ord(\eventid, o)$.
 
 \begin{figure}[h]
@@ -273,6 +273,7 @@ This is clearly unconditionally guaranteed by setting $c \gets \ord(\eventid, o)
     \end{pchstack}
     \end{mdframed}
     \caption{A simplification of the attestation scheme in Figure~\ref{dryja} where the hash function is replaced by $\ord$ which returns the index of the outcome in the event.}
+    \label{replace-ord}
 \end{figure}
 
 
