@@ -335,7 +335,7 @@ This cancels out the honest oracle's contribution to attestation completely as f
 
 Clearly the the malicious oracle can now reveal the combined attestation as $r'_{2} + H(R_{2}||X_{2}||id_{2}|| o_{2})x_{2}$.
 To address this problem we can force oracles to prove knowledge of the the secret nonce in the announcement.
-Note carefully that the malicious oracle does not know the secret key for their announced nonce $R_{2}$, in the above example and so would be unable to produce the proof.
+Note carefully that the malicious oracle does not know the secret key for their announced nonce $R_{2}$ in the above example and so would be unable to produce the proof.
 We conjecture that in the \emph{knowledge of secret key} model (KOSK) \cite{kosk} this would allow us to prove the oracle aggregation scheme to be attestation unforgeable.
 We leave it to a future revision to prove this conjecture.
 
